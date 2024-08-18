@@ -124,13 +124,26 @@ int editor_process_tick()
 
 vec2 editor_move_cursor(const Row *text, vec2 window_size, vec2 current_cursor, vec2 change)
 {
-	int nx = current_cursor.x + change.x;
-	int ny = current_cursor.y + change.y;
-	if (!is_in_range(0, nx, window_size.x) || !is_in_range(0, ny, window_size.y) || nx > text[ny].index)
+	vec2 new_cursor = 
+	{ 
+		.x = current_cursor.x + change.x,
+		.y = current_cursor.y + change.y
+	};
+	if (!editor_is_cursor_in_range(text, window_size, new_cursor))
 	{
 		return current_cursor;
+
 	}
-	return (vec2) { .x = nx, .y = ny };
+	return new_cursor;
+}
+
+bool editor_is_cursor_in_range(const Row *text, vec2 window_size, vec2 cursor_pos)
+{
+	if (!is_in_range(0, cursor_pos.x, window_size.x) || !is_in_range(0, cursor_pos.y, window_size.y))
+	{
+		return false;
+	}
+	return text[cursor_pos.y].index >= cursor_pos.x;
 }
 
 void add_normal_character(Row *text, vec2 *current_cursor, vec2 window_size, char c)
@@ -141,16 +154,14 @@ void add_normal_character(Row *text, vec2 *current_cursor, vec2 window_size, cha
 	}
 	if (current_cursor->x == text[current_cursor->y].index)
 	{
-		text[current_cursor->y].data[current_cursor->x] = c;
 		text[current_cursor->y].index++;
 	}
 	else
 	{
 		row_shift_right(&text[current_cursor->y], window_size, current_cursor->x);
-		text[current_cursor->y].data[current_cursor->x] = c;
-		text[current_cursor->y].data[text[current_cursor->y].index] = '\0';
 	}
-	current_cursor->x++;
+
+	text[current_cursor->y].data[(current_cursor->x)++] = c;
 }
 
 void row_shift_right(Row *row, vec2 window_size, int pos)
@@ -163,6 +174,7 @@ void row_shift_right(Row *row, vec2 window_size, int pos)
 	{
 		throw_up("row_shift_right: pos is not in range");
 	}
+
 	for (int i = row->index; i > pos; i--)
 	{
 		row->data[i] = row->data[i-1];

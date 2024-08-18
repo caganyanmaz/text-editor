@@ -14,6 +14,7 @@ void editor_render_rows(Row *row, vec2 window_size, vec2 cursor_pos, const IO_In
 void row_shift_right(Row *row, vec2 window_size, int pos);
 void add_normal_character(Row *text, vec2 *cursor_pos, vec2 window_size, char c);
 vec2 editor_move_cursor(const Row *text, vec2 window_size, vec2 current_cursor, vec2 change);
+bool editor_is_cursor_in_range(const Row *text, vec2 window_size, vec2 cursor_pos);
 
 
 void editor_add_to_row(Row *row, vec2 window_size, char c);
