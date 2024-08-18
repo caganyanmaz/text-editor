@@ -17,6 +17,7 @@ static vec2 g_cursor_pos;
 static IO_Interface g_io_interface;
 
 
+
 /* Function definitions */
 void editor_init(vec2 _window_size, IO_Interface _io_interface)
 {

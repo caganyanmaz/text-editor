@@ -1,11 +1,10 @@
 #pragma once
 #include <stdlib.h>
+#include "dynamic_array.h"
 
 typedef struct
 {
-	size_t size;
-	size_t reserved;
-	char *buf;
+	DynamicArray *darr;
 } DynamicBuffer;
 
 DynamicBuffer *dbuf_create();
@@ -15,3 +14,8 @@ void dbuf_addc(DynamicBuffer *obj, char c);
 void dbuf_adds(DynamicBuffer *obj, size_t size, const char *s);
 void dbuf_addi(DynamicBuffer *obj, int i);
 void dbuf_clear(DynamicBuffer *obj);
+
+char *dbuf_get(DynamicBuffer *obj, size_t index);
+const char *dbuf_getc(const DynamicBuffer *obj, size_t index);
+
+size_t dbuf_get_size(const DynamicBuffer *obj);

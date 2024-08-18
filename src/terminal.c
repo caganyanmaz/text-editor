@@ -17,7 +17,6 @@ static DynamicBuffer *dbuf;
 /* Private Function Declarations */
 void editor_add_set_cursor_to_start_to_buffer(DynamicBuffer *buf);
 void editor_add_clear_screen_to_buffer(DynamicBuffer *buf);
-void editor_add_hide_cursor_to_buffer(DynamicBuffer *buf);
 void editor_add_reveal_cursor_to_buffer(DynamicBuffer *buf);
 void update_cursor_position();
 
@@ -31,21 +30,32 @@ void setup_terminal_behaviour();
 
 void terminal_init()
 {
+	checkpoint()
 	dbuf = dbuf_create();
+	checkpoint()
+#ifndef DEBUGGING
 	setup_terminal_behaviour();
+#endif
+	checkpoint()
 	struct winsize ws;
+	checkpoint()
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0)
 	{
 		throw_up("get_window_size, ioctl failed");
 	}
+	checkpoint()
 	window_size = (vec2) { .x = ws.ws_col, .y = ws.ws_row };
+	checkpoint()
 	current_cursor_position = (vec2) {.x = 0, .y = 0};
+	checkpoint()
 }
 
 void terminal_terminate()
 {
 	dbuf_destroy(dbuf);
+#ifndef DEBUGGING
 	restore_terminal_behaviour();
+#endif
 }
 
 vec2 get_window_size()
@@ -140,7 +150,7 @@ int terminal_read_special_sequence()
 
 void terminal_flush_output()
 {
-	handle_error(write(STDIN_FILENO, dbuf->buf, dbuf->size), "terminal_flush_output: write failed");
+	handle_error(write(STDIN_FILENO, dbuf_getc(dbuf, 0), dbuf_get_size(dbuf)), "terminal_flush_output: write failed");
 	dbuf_clear(dbuf);
 	update_cursor_position();
 }
@@ -163,7 +173,7 @@ void terminal_reveal_cursor()
 
 void update_cursor_position()
 {
-	if (dbuf->size > 0)
+	if (dbuf_get_size(dbuf) > 0)
 	{
 		throw_up("terminal_set_cursor_pos: buffer isn't empty");
 	}
@@ -172,16 +182,16 @@ void update_cursor_position()
 	dbuf_addc(dbuf, ';');
 	dbuf_addi(dbuf, current_cursor_position.x+1);
 	dbuf_addc(dbuf, 'H');
-	handle_error(write(STDIN_FILENO, dbuf->buf, dbuf->size), "terminal_set_cursor_pos: write failed");
+	handle_error(write(STDIN_FILENO, dbuf_getc(dbuf, 0), dbuf_get_size(dbuf)), "terminal_set_cursor_pos: write failed");
 	dbuf_clear(dbuf);
 }
 
 void print_delicate()
 {
-	printf("\nDelicate buffer(%d): ", (int)dbuf->size);
-	for (int i = 0; i < dbuf->size; i++)
+	printf("\nDelicate buffer(%d): ", (int)dbuf_get_size(dbuf));
+	for (int i = 0; i < dbuf_get_size(dbuf); i++)
 	{
-		printf("%d ", dbuf->buf[i]);
+		printf("%d ", *dbuf_getc(dbuf, i));
 	}
 	printf("\n");
 }

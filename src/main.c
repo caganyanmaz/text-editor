@@ -17,6 +17,10 @@ static IO_Interface terminal_interface =
 
 int main() 
 {
+#ifdef DEBUGGING
+	setvbuf(stdout, NULL, _IONBF, 0);
+#endif
+
 	terminal_init();
 	vec2 window_size = get_window_size();
 	editor_init(window_size, terminal_interface);
@@ -28,8 +32,10 @@ int main()
 		editor_render_screen();
 	} while (user_input_res == TEXT_EDITOR_SUCCESSFUL_READ);
 	editor_clear_screen();
+
 	editor_terminate();
 	terminal_terminate();
+	
 	system("clear");
 	return 0;
 }
