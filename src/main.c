@@ -15,7 +15,7 @@ static IO_Interface terminal_interface =
 	.clear_screen = terminal_clear_screen,
 };
 
-int main() 
+int main(int argc, char **argv) 
 {
 #ifdef DEBUGGING
 	setvbuf(stdout, NULL, _IONBF, 0);
@@ -24,6 +24,11 @@ int main()
 	terminal_init();
 	vec2 window_size = get_window_size();
 	editor_init(window_size, terminal_interface);
+	if (argc > 1)
+	{
+		printf("%s\n", argv[1]);
+		editor_read_file(argv[1]);
+	}
 	editor_clear_screen();
 	int user_input_res;
 	do
@@ -32,10 +37,8 @@ int main()
 		editor_render_screen();
 	} while (user_input_res == TEXT_EDITOR_SUCCESSFUL_READ);
 	editor_clear_screen();
-
 	editor_terminate();
 	terminal_terminate();
-	
 	system("clear");
 	return 0;
 }

@@ -14,6 +14,7 @@ typedef struct
 } IO_Interface;
 
 void editor_init(vec2 window_size, IO_Interface io_interface);
+void editor_read_file(const char *filename);
 void editor_terminate();
 void editor_clear_screen();
 void editor_render_screen();

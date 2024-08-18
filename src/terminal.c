@@ -30,24 +30,17 @@ void setup_terminal_behaviour();
 
 void terminal_init()
 {
-	checkpoint()
 	dbuf = dbuf_create();
-	checkpoint()
 #ifndef DEBUGGING
 	setup_terminal_behaviour();
 #endif
-	checkpoint()
 	struct winsize ws;
-	checkpoint()
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0)
 	{
 		throw_up("get_window_size, ioctl failed");
 	}
-	checkpoint()
 	window_size = (vec2) { .x = ws.ws_col, .y = ws.ws_row };
-	checkpoint()
 	current_cursor_position = (vec2) {.x = 0, .y = 0};
-	checkpoint()
 }
 
 void terminal_terminate()
