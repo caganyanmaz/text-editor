@@ -64,10 +64,10 @@ void dbuf_addc(DynamicBuffer *obj, char c)
 void dbuf_adds(DynamicBuffer *obj, size_t size, const char *s)
 {
 	tassert(obj, "dbuf_adds: obj is NULL");
-	tassert(s[size] == NUL, "dbuf_adds: Given string must be terminated by NUL character (not included in the size)");
 
 	darr_pop(obj->darr);
-	darr_add_multiple(obj->darr, size+1, s);
+	darr_add_multiple(obj->darr, size, s);
+	darr_add_single(obj->darr, "\0");
 }
 
 void dbuf_insertc_to(DynamicBuffer *obj, size_t pos, char c)
@@ -87,9 +87,35 @@ void dbuf_shift_right(DynamicBuffer *obj, size_t pos)
 	darr_shift_right(obj->darr, pos);
 }
 
+void dbuf_shift_left(DynamicBuffer *obj, size_t start_pos)
+{
+	tassert(obj, "dbuf_shift_left: obj is NULL");
+	tassert(0 <= start_pos && start_pos < dbuf_get_size(obj), "dbuf_shift_left: start_pos is out of range");
+	
+	darr_shift_left(obj->darr, start_pos);
+}
+
+void dbuf_popc(DynamicBuffer *obj)
+{
+	tassert(obj, "dbuf_popc: obj is NULL");
+	tassert(dbuf_get_size(obj) > 0 , "dbuf_popc: buffer is empty");
+	
+	darr_pop(obj->darr);
+	*(char *)darr_get(obj->darr, dbuf_get_size(obj)) = '\0';
+}
+
+void dbuf_popm(DynamicBuffer *obj, size_t count)
+{
+	for (size_t i = 0; i < count; i++)
+	{
+		dbuf_popc(obj);
+	}
+}
+
 char *dbuf_get(DynamicBuffer *obj, size_t index)
 {
 	tassert(obj, "dbuf_get: obj is NULL");
+	tassert(index < dbuf_get_size(obj), "dbuf_get: index out of range");
 
 	return darr_get(obj->darr, index);
 }
@@ -97,6 +123,25 @@ char *dbuf_get(DynamicBuffer *obj, size_t index)
 const char *dbuf_getc(const DynamicBuffer *obj, size_t index)
 {
 	tassert(obj, "dbuf_getc: obj is NULL");
+	tassert(index < dbuf_get_size(obj), "dbuf_getc: index out of range");
+
+	return darr_getc(obj->darr, index);
+}
+
+
+char *dbuf_get_with_nul(DynamicBuffer *obj, size_t index)
+{
+	tassert(obj, "dbuf_getc: obj is NULL");
+	tassert(index < dbuf_get_size(obj) + 1, "dbuf_get_with_nul: index out of range");
+	
+	return darr_get(obj->darr, index);
+}
+
+const char *dbuf_get_with_nulc(const DynamicBuffer *obj, size_t index)
+{
+	tassert(obj, "dbuf_getc: obj is NULL");
+	debuglu(dbuf_get_size(obj));
+	tassert(index < dbuf_get_size(obj) + 1, "dbuf_get_with_nulc: index out of range");
 
 	return darr_getc(obj->darr, index);
 }
@@ -112,6 +157,6 @@ void dbuf_clear(DynamicBuffer *obj)
 size_t dbuf_get_size(const DynamicBuffer *obj)
 {
 	tassert(obj, "dbuf_get_size: obj is NULL");
-
-	return obj->darr->length - 1; // Not including the NULL character 
+	tassert(darr_get_size(obj->darr) > 0, "dbuf_get_size: No NUL character in buffer");
+	return darr_get_size(obj->darr) - 1; // Not including the NULL character 
 }

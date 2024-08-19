@@ -13,12 +13,14 @@
 #define debugs(x) printf("%s:%d - %s = %s\n", __FILE__, __LINE__, #x, x);
 #define debugf(x) printf("%s:%d - %s = %f\n", __FILE__, __LINE__, #x, x);
 #define debugp(x) printf("%s:%d - %s = %p\n", __FILE__, __LINE__, #x, x);
+#define debuglu(x) printf("%s:%d - %s = %lu\n", __FILE__, __LINE__, #x, x);
 #else
 #define debugi(...) {}
 #define debugc(...) {}
 #define debugs(...) {}
 #define debugf(...) {}
 #define debugp(...) {}
+#define debuglu(...) {}
 #endif
 
 #ifdef CHECKPOINTS

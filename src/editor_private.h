@@ -19,7 +19,6 @@ typedef struct
 
 typedef struct
 {
-	const char *filename;
 	DynamicArray *darr; // Dynamic Array of Dynamic buffers
 } FileData;
 
@@ -27,6 +26,8 @@ typedef struct
 /* Private function declarations */
 void editor_render_rows(const FileData *fd, vec2 window_size, vec2 cursor_pos, int top_file_index, const IO_Interface *io_interface, LastPrintScreenData *last_print_screen_data);
 vec2 editor_move_cursor(const LastPrintScreenData *last_print_screen_data, vec2 current_cursor, vec2 change);
+vec2 editor_advance_cursor(vec2 cursor, vec2 window_size);
+vec2 editor_retreat_cursor(vec2 cursor, const LastPrintScreenData *last_print_screen_data);
 bool editor_is_cursor_in_range(const LastPrintScreenData *last_print_screen_data, vec2 cursor_pos);
 
 

@@ -24,7 +24,9 @@ void darr_clear(DynamicArray *obj);
 
 size_t darr_get_size(const DynamicArray *obj);
 
-void darr_shift_right(DynamicArray *obj, size_t pos);
+void darr_shift_right(DynamicArray *obj, size_t start_pos);
+void darr_shift_left(DynamicArray *obj, size_t start_pos);
 void darr_insert_to(DynamicArray *obj, size_t pos, const void *val);
+
 
 

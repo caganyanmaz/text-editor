@@ -20,7 +20,7 @@ void editor_add_clear_screen_to_buffer(DynamicBuffer *buf);
 void editor_add_reveal_cursor_to_buffer(DynamicBuffer *buf);
 void update_cursor_position();
 
-int terminal_read_special_sequence();
+int terminal_read_ANSI_sequence();
 
 void print_delicate();
 
@@ -110,13 +110,13 @@ int terminal_read_key()
 	handle_error(read(STDIN_FILENO, &c, 1), "read failed");
 	if (c == '\x1b') 
 	{
-		return terminal_read_special_sequence();
+		return terminal_read_ANSI_sequence();
 	}
 	return c;
 }
 
 
-int terminal_read_special_sequence()
+int terminal_read_ANSI_sequence()
 {
 	char seq[3];
 	if (read(STDIN_FILENO, &seq[0], 1) != 1)

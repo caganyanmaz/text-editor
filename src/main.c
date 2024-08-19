@@ -20,15 +20,15 @@ int main(int argc, char **argv)
 #ifdef DEBUGGING
 	setvbuf(stdout, NULL, _IONBF, 0);
 #endif
-
+	if (argc < 2)
+	{
+		printf("You need to include the file name as the second argument\n");
+		return 0;
+	}
 	terminal_init();
 	vec2 window_size = get_window_size();
 	editor_init(window_size, terminal_interface);
-	if (argc > 1)
-	{
-		printf("%s\n", argv[1]);
-		editor_read_file(argv[1]);
-	}
+	editor_read_file(argv[1]);
 	editor_clear_screen();
 	int user_input_res;
 	do
@@ -36,6 +36,7 @@ int main(int argc, char **argv)
 		user_input_res = editor_process_tick();
 		editor_render_screen();
 	} while (user_input_res == TEXT_EDITOR_SUCCESSFUL_READ);
+	editor_write_file(argv[1]);
 	editor_clear_screen();
 	editor_terminate();
 	terminal_terminate();

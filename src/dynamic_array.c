@@ -127,10 +127,21 @@ void darr_shift_right(DynamicArray *obj, size_t pos)
 	tassert(obj, "darr_shift_right: obj is NULL");
 	tassert(0 <= pos && pos < darr_get_size(obj), "darr_shfit_right: position out of range");
 	darr_add_single(obj, darr_getc(obj, darr_get_size(obj) - 1));
-	for (int i = obj->length - 1; i > pos; i--)
+	for (size_t i = obj->length - 1; i > pos; i--)
 	{
 		memcpy(darr_get(obj, i), darr_getc(obj, i-1), obj->unit_size);
 	}
+}
+
+void darr_shift_left(DynamicArray *obj, size_t start_pos)
+{
+	tassert(obj, "darr_shift_left: obj is NULL");
+	tassert(0 <= start_pos && start_pos < darr_get_size(obj), "darr_shift_left: position out of range");
+	for (size_t i = start_pos; i < darr_get_size(obj) - 1; i++)
+	{
+		memcpy(darr_get(obj, i), darr_getc(obj, i+1), obj->unit_size);
+	}
+	darr_pop(obj);
 }
 
 void *darr_get_byte(DynamicArray *obj, size_t byte_index)
