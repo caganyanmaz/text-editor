@@ -2,7 +2,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <string.h>
-#include "definitions.h"
+#include "definitions.h" 
 #include "error_handling.h"
 #include "dynamic_buffer.h"
 #include "terminal.h"
@@ -85,9 +85,9 @@ void editor_render_screen(const Editor *obj)
 	editor_render_rows(&obj->file_data, &obj->print_text_data, &obj->io_interface);
 	obj->io_interface.reveal_cursor();
 	obj->io_interface.flush_output();
-	obj->io_interface.set_cursor_position(obj->screen_data.cursor_pos.x, obj->screen_data.cursor_pos.y);
+	vec2 real_cursor_position = get_real_cursor_position(&obj->screen_data, &obj->print_text_data);
+	obj->io_interface.set_cursor_position(real_cursor_position.x, real_cursor_position.y);
 }
-
 
 void editor_clear_screen(const Editor *obj)
 {
@@ -100,6 +100,25 @@ int ctrl_key(char c)
 	return c & (0x1f);
 }
 
+vec2 get_real_cursor_position(const ScreenData *screen_data, const PrintTextData *print_text_data)
+{
+	for (int i = 0; i < print_text_data->col_count; i++)
+	{
+		size_t file_row       = print_text_data->data[i].file_row;
+		size_t file_start_col = print_text_data->data[i].file_start_col;
+		size_t file_end_col   = file_start_col + print_text_data->data[i].index;
+		debuglu(file_row);
+		debuglu(file_start_col);
+		debuglu(file_end_col);
+		if (screen_data->cursor_pos.y == file_row && is_in_range(file_start_col, screen_data->cursor_pos.x, file_end_col+1))
+		{
+			return (vec2) { .x = screen_data->cursor_pos.x - file_start_col, .y = i };
+		}
+	}
+	throw_up("Couldn't find cursor");
+	return (vec2) {.x = -1, .y = -1};
+}
+
 void editor_render_rows(const FileData *fd, const PrintTextData *print_text_data, const IO_Interface *io_interface)
 {
 	for (size_t i = 0; i < print_text_data->col_count; i++)
@@ -109,6 +128,7 @@ void editor_render_rows(const FileData *fd, const PrintTextData *print_text_data
 			io_interface->render_row(i, 1, "~");
 			continue;
 		}
+		debuglu(print_text_data->data[i].index);
 		const DynamicBuffer *dbuf = *(DynamicBuffer**)darr_getc(fd->darr, print_text_data->data[i].file_row);
 		const char *row_data      = dbuf_get_with_nulc(dbuf, print_text_data->data[i].file_start_col);
 		size_t row_size           = print_text_data->data[i].index;
@@ -116,14 +136,13 @@ void editor_render_rows(const FileData *fd, const PrintTextData *print_text_data
 	}
 }
 
-
 void editor_update_print_text_data(PrintTextData *print_text_data, const FileData *fd, const ScreenData *sd)
 {
 	size_t file_row = sd->top_file_row;
 	size_t file_col = 0;
 	for (int i = 0; i < sd->window_size.y; i++)
 	{
-		if (file_row >= darr_get_size(fd->darr) && sd->cursor_pos.y != i)
+		if (file_row >= darr_get_size(fd->darr) && sd->cursor_pos.y != file_row)
 		{
 			print_text_data->data[i] = editor_update_out_of_range_row_data();
 			continue;
@@ -172,10 +191,10 @@ PrintRowData editor_update_empty_cursor_row_data(const FileData *fd, size_t last
 	return (PrintRowData) { .index = 0, .file_row = last_file_row, .file_start_col = last_line_size };
 }
 
-
 int editor_process_tick(Editor *obj)
 {
 	int res = process_keypress(&obj->screen_data, &obj->file_data, &obj->print_text_data, &obj->io_interface);	
+ 	adjust_top_file_row(&obj->screen_data, &obj->file_data);
 	editor_update_print_text_data(&obj->print_text_data, &obj->file_data, &obj->screen_data);
 	return res;
 }
@@ -190,16 +209,16 @@ int process_keypress(ScreenData *screen_data, FileData *file_data, const PrintTe
 		case NUL:
 			return TEXT_EDITOR_SUCCESSFUL_READ;
 		case ARROW_UP:
-			screen_data->cursor_pos = editor_move_cursor(print_text_data, screen_data->cursor_pos, (vec2) {.x = 0, .y = -1});
+			screen_data->cursor_pos = editor_move_cursor(file_data, screen_data->cursor_pos, (vec2) {.x = 0, .y = -1});
 			return TEXT_EDITOR_SUCCESSFUL_READ;
 		case ARROW_DOWN:
-			screen_data->cursor_pos = editor_move_cursor(print_text_data, screen_data->cursor_pos, (vec2) {.x = 0, .y = 1});
+			screen_data->cursor_pos = editor_move_cursor(file_data, screen_data->cursor_pos, (vec2) {.x = 0, .y = 1});
 			return TEXT_EDITOR_SUCCESSFUL_READ;
 		case ARROW_LEFT:
-			screen_data->cursor_pos = editor_move_cursor(print_text_data, screen_data->cursor_pos, (vec2) {.x = -1, .y = 0});
+			screen_data->cursor_pos = editor_move_cursor(file_data, screen_data->cursor_pos, (vec2) {.x = -1, .y = 0});
 			return TEXT_EDITOR_SUCCESSFUL_READ;
 		case ARROW_RIGHT:
-			screen_data->cursor_pos = editor_move_cursor(print_text_data, screen_data->cursor_pos, (vec2) {.x = 1, .y = 0});
+			screen_data->cursor_pos = editor_move_cursor(file_data, screen_data->cursor_pos, (vec2) {.x = 1, .y = 0});
 			return TEXT_EDITOR_SUCCESSFUL_READ;
 		case BACKSPACE:
 			process_backspace(screen_data, file_data, print_text_data);
@@ -218,9 +237,8 @@ int process_keypress(ScreenData *screen_data, FileData *file_data, const PrintTe
 
 void process_backspace(ScreenData *screen_data, FileData *file_data, const PrintTextData *print_text_data)
 {
-	vec2 file_pos = get_file_pos(print_text_data, screen_data->cursor_pos);
-	size_t file_row = file_pos.y;
-	size_t file_col = file_pos.x;
+	size_t file_row = screen_data->cursor_pos.y;
+	size_t file_col = screen_data->cursor_pos.x;
 	// If we're at the start of file, we don't do anything
 	if (file_col == 0 && file_row == 0)
 	{
@@ -242,7 +260,7 @@ void process_backspace(ScreenData *screen_data, FileData *file_data, const Print
 	{
 		dbuf_shift_left(current_row, file_col - 1); 
 	}
-	screen_data->cursor_pos = editor_retreat_cursor(screen_data->cursor_pos, print_text_data);
+	screen_data->cursor_pos = editor_retreat_cursor(screen_data->cursor_pos, file_data);
 	// Reverting the cursor position by one
 	return;
 }
@@ -250,83 +268,103 @@ void process_backspace(ScreenData *screen_data, FileData *file_data, const Print
 
 void process_carriage_return(ScreenData *screen_data, FileData *file_data, const PrintTextData *print_text_data)
 {
-	vec2 file_pos = get_file_pos(print_text_data, screen_data->cursor_pos);
-	size_t file_row = file_pos.y;
-	size_t file_col = file_pos.x;
+	size_t file_row = screen_data->cursor_pos.y;
+	size_t file_col = screen_data->cursor_pos.x;
 	// Create new line
 	DynamicBuffer *current_row = *(DynamicBuffer**)darr_get(file_data->darr, file_row);
 	DynamicBuffer *new_row     = dbuf_create();
 	const char *current_row_text_at_cursor_right = dbuf_get_with_nulc(current_row, file_col);
 	size_t current_row_text_at_cursor_right_size = dbuf_get_size(current_row) - file_col;
+
 	dbuf_adds(new_row, current_row_text_at_cursor_right_size, current_row_text_at_cursor_right);
 	dbuf_popm(current_row, current_row_text_at_cursor_right_size);
 	darr_insert_to(file_data->darr, file_row + 1, &new_row);
-	screen_data->cursor_pos.x = 0;
-	screen_data->cursor_pos.y++;
+	screen_data->cursor_pos = editor_move_cursor_to_next_line_beginning(screen_data->cursor_pos);
+}
+
+vec2 editor_move_cursor_to_next_line_beginning(vec2 cursor_pos)
+{
+	cursor_pos.x = 0;
+	cursor_pos.y++;
+	return cursor_pos;
 }
 
 void process_printable_character(ScreenData *screen_data, FileData *file_data, const PrintTextData *print_text_data, char c)
 {
-	vec2 file_pos = get_file_pos(print_text_data, screen_data->cursor_pos);
-	size_t file_row = file_pos.y;
-	size_t file_col = file_pos.x;
+	size_t file_row = screen_data->cursor_pos.y;
+	size_t file_col = screen_data->cursor_pos.x;
 	dbuf_insertc_to(*(DynamicBuffer**)darr_get(file_data->darr, file_row), file_col, c);
-	screen_data->cursor_pos = editor_advance_cursor(screen_data->cursor_pos, screen_data->window_size);
+	screen_data->cursor_pos = editor_advance_cursor(screen_data->cursor_pos);
 }
 
-vec2 get_file_pos(const PrintTextData *print_text_data, vec2 cursor_pos)
+void adjust_top_file_row(ScreenData *screen_data, const FileData *file_data)
 {
-	size_t file_row = print_text_data->data[cursor_pos.y].file_row;
-	size_t file_col = cursor_pos.x + print_text_data->data[cursor_pos.y].file_start_col;
-	return (vec2){ .x = file_col, .y = file_row };
+	// If cursor is left behind (that's pretty easy because we just need to set the starting position to the starting line)
+	if (screen_data->cursor_pos.y < screen_data->top_file_row)
+	{
+		screen_data->top_file_row = screen_data->cursor_pos.y;
+		return;
+	}
+	// Add required lines until we reach cursor file (it will need to contain the entire lines)
+	int lines_needed = 0;
+	for (int i = screen_data->top_file_row; i <= screen_data->cursor_pos.y; i++)
+	{
+		const DynamicBuffer *current_line = *(const DynamicBuffer**)darr_getc(file_data->darr, i);
+		lines_needed += 1 + (((int)dbuf_get_size(current_line) - 1) / screen_data->window_size.x);
+	}
+	for (; lines_needed > screen_data->window_size.y; screen_data->top_file_row++)
+	{
+		tassert(screen_data->top_file_row < screen_data->cursor_pos.y, "adjust_top_file_row: cursor line is too big"); 
+		const DynamicBuffer *current_line = *(const DynamicBuffer**)darr_getc(file_data->darr, screen_data->top_file_row);
+		lines_needed -= 1 + (((int)dbuf_get_size(current_line) - 1) / screen_data->window_size.x);
+	}
 }
 
-
-vec2 editor_advance_cursor(vec2 cursor, vec2 window_size)
+size_t shift_top_file_row(size_t top_file, int change, size_t file_row_count)
 {
-	if( cursor.x == window_size.x - 1 && cursor.y == window_size.y - 1)
+	if (((int)top_file) + change < 0)
 	{
-		// TODO: Need to add g_top_file change when cursor hits window end
-		// Right now doing nothing
-		return cursor;
+		return 0;
 	}
-	if (cursor.x == window_size.x - 1)
+	// It's safe to add them up together since previous condition was false
+	if (top_file + change > file_row_count)
 	{
-		cursor.y++;
-		cursor.x = 0;
-		return cursor;
+		return file_row_count;
 	}
+	return top_file + change;
+}
+
+vec2 editor_advance_cursor(vec2 cursor)
+{
 	cursor.x++;
 	return cursor;
 }
 
-vec2 editor_retreat_cursor(vec2 cursor, const PrintTextData *last_print_text_data)
+vec2 editor_retreat_cursor(vec2 cursor, const FileData *file_data)
 {
 	if (cursor.x == 0 && cursor.y == 0)
 	{
-		// TODO: Need to add g_top_file change when cursor hits window beginning
-		// Right now doing nothing
 		return cursor;
 	}
 	if (cursor.x == 0)
 	{
 		cursor.y--;
-		cursor.x = last_print_text_data->data[cursor.y].index;
+		DynamicBuffer *current_line = *(DynamicBuffer**)darr_getc(file_data->darr, cursor.y);
+		cursor.x = dbuf_get_size(current_line);
 		return cursor;
 	}
 	cursor.x--;
 	return cursor;
-
 }
 
-vec2 editor_move_cursor(const PrintTextData *last_print_text_data, vec2 current_cursor, vec2 change)
+vec2 editor_move_cursor(const FileData *file_data, vec2 current_cursor, vec2 change)
 {
 	vec2 new_cursor = 
 	{ 
 		.x = current_cursor.x + change.x,
 		.y = current_cursor.y + change.y
 	};
-	if (!editor_is_cursor_in_range(last_print_text_data, new_cursor))
+	if (!editor_is_cursor_in_range(file_data, new_cursor))
 	{
 		return current_cursor;
 
@@ -334,13 +372,14 @@ vec2 editor_move_cursor(const PrintTextData *last_print_text_data, vec2 current_
 	return new_cursor;
 }
 
-bool editor_is_cursor_in_range(const PrintTextData *last_print_text_data, vec2 cursor_pos)
+bool editor_is_cursor_in_range(const FileData *file_data, vec2 cursor_pos)
 {
-	if (!is_in_range(0, cursor_pos.y, last_print_text_data->col_count))
+	if (!is_in_range(0, cursor_pos.y, darr_get_size(file_data->darr)))
 	{
 		return false;
 	}
-	return last_print_text_data->data[cursor_pos.y].index != -1 && last_print_text_data->data[cursor_pos.y].index >= cursor_pos.x;
+	const DynamicBuffer *cursor_line = *(DynamicBuffer**)darr_getc(file_data->darr, cursor_pos.y);
+	return is_in_range(0, cursor_pos.x, dbuf_get_size(cursor_line) + 1);
 }
 
 bool is_in_range(int l, int i, int r)

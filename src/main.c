@@ -33,8 +33,11 @@ int main(int argc, char **argv)
 	int user_input_res;
 	do
 	{
+		checkpoint()
 		user_input_res = editor_process_tick(editor);
+		checkpoint()
 		editor_render_screen(editor);
+		checkpoint()
 	} while (user_input_res == TEXT_EDITOR_SUCCESSFUL_READ);
 	editor_write_file(editor, argv[1]);
 	editor_clear_screen(editor);

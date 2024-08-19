@@ -8,12 +8,12 @@
 //#define DEBUGGING
 
 #ifdef DEBUGGING
-#define debugi(x) printf("%s:%d - %s = %d\n", __FILE__, __LINE__, #x, x);
-#define debugc(x) printf("%s:%d - %s = %c\n", __FILE__, __LINE__, #x, x);
-#define debugs(x) printf("%s:%d - %s = %s\n", __FILE__, __LINE__, #x, x);
-#define debugf(x) printf("%s:%d - %s = %f\n", __FILE__, __LINE__, #x, x);
-#define debugp(x) printf("%s:%d - %s = %p\n", __FILE__, __LINE__, #x, x);
-#define debuglu(x) printf("%s:%d - %s = %lu\n", __FILE__, __LINE__, #x, x);
+#define debugi(x)  fprintf(stderr, "%s:%d - %s = %d\n", __FILE__, __LINE__, #x, x);
+#define debugc(x)  fprintf(stderr, "%s:%d - %s = %c\n", __FILE__, __LINE__, #x, x);
+#define debugs(x)  fprintf(stderr, "%s:%d - %s = %s\n", __FILE__, __LINE__, #x, x);
+#define debugf(x)  fprintf(stderr, "%s:%d - %s = %f\n", __FILE__, __LINE__, #x, x);
+#define debugp(x)  fprintf(stderr, "%s:%d - %s = %p\n", __FILE__, __LINE__, #x, x);
+#define debuglu(x) fprintf(stderr, "%s:%d - %s = %lu\n", __FILE__, __LINE__, #x, x);
 #else
 #define debugi(...) {}
 #define debugc(...) {}
@@ -24,7 +24,7 @@
 #endif
 
 #ifdef CHECKPOINTS
-#define checkpoint() { printf("Checkpoint at %s:%d\n", __FILE__, __LINE__); }
+#define checkpoint() { fprintf(stderr, "Checkpoint at %s:%d\n", __FILE__, __LINE__); }
 #else
 #define checkpoint() {}
 #endif
