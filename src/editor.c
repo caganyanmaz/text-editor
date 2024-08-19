@@ -93,18 +93,24 @@ void editor_render_screen(const Editor *obj)
 	editor_render_rows(&obj->file_data, &obj->print_text_data, &obj->io_interface);
 	if (obj->state == EDITOR_SEARCH_STATE)
 	{
-		const char *prefix = "Search: ";
-		size_t prefix_len  = strlen(prefix);
-		size_t msg_len     = obj->search_data.searched_text_index + prefix_len;
-		char *msg = malloc(msg_len * sizeof(char));
-		strncpy(msg, prefix, prefix_len);
-		strncpy(msg + prefix_len, obj->search_data.searched_text, obj->search_data.searched_text_index);
-		obj->io_interface.render_row(obj->print_text_data.col_count, msg_len, msg);
+		editor_render_search_bar(&obj->search_data, &obj->print_text_data, &obj->io_interface);
 	}
 	obj->io_interface.reveal_cursor();
 	obj->io_interface.flush_output();
 	vec2 real_cursor_position = get_real_cursor_position(&obj->screen_data, &obj->print_text_data);
 	obj->io_interface.set_cursor_position(real_cursor_position.x, real_cursor_position.y);
+}
+
+void editor_render_search_bar(const SearchData *search_data, const PrintTextData *print_text_data, const IO_Interface *io_interface)
+{
+
+	const char *prefix = "Search: ";
+	size_t prefix_len  = strlen(prefix);
+	size_t msg_len     = search_data->searched_text_index + prefix_len;
+	char *msg = malloc(msg_len * sizeof(char));
+	strncpy(msg, prefix, prefix_len);
+	strncpy(msg + prefix_len, search_data->searched_text, search_data->searched_text_index);
+	io_interface->render_row(print_text_data->col_count, msg_len, msg);
 }
 
 void editor_clear_screen(const Editor *obj)

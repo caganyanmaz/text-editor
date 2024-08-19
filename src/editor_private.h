@@ -102,3 +102,5 @@ void editor_process_arrow_for_search_state(SearchData *search_data, ScreenData *
 
 
 void editor_process_line_matches(SearchData *search_data, const DynamicBuffer *line, int line_index);
+
+void editor_render_search_bar(const SearchData *search_data, const PrintTextData *print_text_data, const IO_Interface *io_interface);
