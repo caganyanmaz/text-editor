@@ -213,105 +213,116 @@ int editor_process_tick(Editor *obj)
 	{
 		res = editor_process_keypress_for_write_state(&obj->screen_data, &obj->file_data, &obj->print_text_data, c);	
 	}
-	if (obj->state == EDITOR_SEARCH_STATE)
+	else if (obj->state == EDITOR_SEARCH_STATE)
 	{
 		res = editor_process_keypress_for_search_state(&obj->search_data, &obj->screen_data, &obj->file_data, c);
 	}
 	adjust_top_file_row(&obj->screen_data, &obj->file_data);
 	editor_update_print_text_data(&obj->print_text_data, &obj->file_data, &obj->screen_data);
-	if (res == TEXT_EDITOR_SWITCH_TO_SEARCH_STATE)
+	return editor_process_state_tick_result(&obj->state, res);
+}
+
+int editor_process_state_tick_result(int* state, int res)
+{
+	switch (res)
 	{
-		obj->state = EDITOR_SEARCH_STATE;
-	}
-	if (res == TEXT_EDITOR_SWITCH_TO_WRITE_STATE)
-	{
-		obj->state = EDITOR_WRITE_STATE;
-	}
-	if (res == TEXT_EDITOR_EOF)
-	{
-		return TEXT_EDITOR_EOF;
+		case TEXT_EDITOR_SWITCH_TO_SEARCH_STATE:
+			*state = EDITOR_SEARCH_STATE;
+			return TEXT_EDITOR_SUCCESSFUL_READ;
+		case TEXT_EDITOR_SWITCH_TO_WRITE_STATE:
+			*state = EDITOR_WRITE_STATE;
+			return TEXT_EDITOR_SUCCESSFUL_READ;
+		case TEXT_EDITOR_EOF:
+			return TEXT_EDITOR_EOF;
 	}
 	return TEXT_EDITOR_SUCCESSFUL_READ;
 }
 
 int editor_process_keypress_for_search_state(SearchData *search_data, ScreenData *screen_data, const FileData *file_data, int c) 
 {
-	if (c == QUIT_KEY)
+	switch (c)
 	{
-		return TEXT_EDITOR_EOF;
-	}
-	if (c == NUL)
-	{
-		return TEXT_EDITOR_SUCCESSFUL_READ;
-	}
-	if (c == 'x')
-	{
-		return TEXT_EDITOR_SWITCH_TO_WRITE_STATE;
+		case QUIT_KEY:
+			return TEXT_EDITOR_EOF;
+		case NUL:
+			return TEXT_EDITOR_SUCCESSFUL_READ;
+		case CTRL('X'):
+			return TEXT_EDITOR_SWITCH_TO_WRITE_STATE;
+		case BACKSPACE:
+			editor_process_backspace_for_search_state(search_data);
+			return TEXT_EDITOR_SUCCESSFUL_READ;
+		case CARRIAGE_RETURN:
+			editor_process_carriage_return_for_search_state(search_data, screen_data, file_data);
+			return TEXT_EDITOR_SUCCESSFUL_READ;
+		case ARROW_UP:
+			editor_process_arrow_for_search_state(search_data, screen_data, -1);
+			return TEXT_EDITOR_SUCCESSFUL_READ;
+		case ARROW_DOWN:
+			editor_process_arrow_for_search_state(search_data, screen_data, 1);
+			return TEXT_EDITOR_SUCCESSFUL_READ;
 	}
 	if (is_a_printable_character(c))
 	{
 		search_data->searched_text[search_data->searched_text_index++] = c;
-		return TEXT_EDITOR_SUCCESSFUL_READ;
-	}
-	if (c == BACKSPACE)
-	{
-		if (search_data->searched_text_index == 0)
-		{
-			return TEXT_EDITOR_SUCCESSFUL_READ;
-		}
-		search_data->searched_text_index--;
-		return TEXT_EDITOR_SUCCESSFUL_READ;
-	}
-	if (c == CARRIAGE_RETURN)
-	{
-		darr_clear(search_data->matches);
-		for (int i = 0; i < darr_get_size(file_data->darr); i++)
-		{
-			const DynamicBuffer *current_line = *(DynamicBuffer**)darr_getc(file_data->darr, i);
-			for (int j = 0; j + search_data->searched_text_index <= dbuf_get_size(current_line); j++)
-			{
-				int res = strncmp(dbuf_getc(current_line, j), search_data->searched_text, search_data->searched_text_index);
-				if (!res)
-				{
-					darr_add_single(search_data->matches, &((vec2) {.x = j, .y = i}));
-				}
-			}
-		}
-		if (darr_get_size(search_data->matches) == 0)
-		{
-			return TEXT_EDITOR_SUCCESSFUL_READ;
-		}
-		vec2 first_instance = *(const vec2*)darr_getc(search_data->matches, 0);
-		tassert(editor_is_cursor_in_range(file_data, first_instance), "editor_process_keypress_for_search_state: Cursor set to an invalid position");
-		screen_data->cursor_pos = first_instance;
-		return TEXT_EDITOR_SUCCESSFUL_READ;
-	}
-	if (c == ARROW_UP)
-	{
-		checkpoint()
-		debuglu(darr_get_size(search_data->matches));
-		// No data to search
-		if (darr_get_size(search_data->matches) == 0)
-		{
-			return TEXT_EDITOR_SUCCESSFUL_READ;
-		}
-		size_t match_count = darr_get_size(search_data->matches);
-		search_data->match_index = ((search_data->match_index - 1) + match_count) % match_count;
-		screen_data->cursor_pos = *(const vec2*)darr_getc(search_data->matches, search_data->match_index);
-		return TEXT_EDITOR_SUCCESSFUL_READ;
-	}
-	if (c == ARROW_DOWN)
-	{
-		if (darr_get_size(search_data->matches) == 0)
-		{
-			return TEXT_EDITOR_SUCCESSFUL_READ;
-		}
-		size_t match_count = darr_get_size(search_data->matches);
-		search_data->match_index = (search_data->match_index + 1) % match_count;
-		screen_data->cursor_pos = *(const vec2*)darr_getc(search_data->matches, search_data->match_index);
-		return TEXT_EDITOR_SUCCESSFUL_READ;
 	}
 	return TEXT_EDITOR_SUCCESSFUL_READ;
+}
+
+void editor_process_backspace_for_search_state(SearchData *search_data)
+{
+	if (search_data->searched_text_index > 0)
+	{
+		search_data->searched_text_index--;
+	}
+}
+
+void editor_process_carriage_return_for_search_state(SearchData *search_data, ScreenData *screen_data, const FileData *file_data)
+{
+	darr_clear(search_data->matches);
+	search_data->match_index = 0;
+	for (int i = 0; i < darr_get_size(file_data->darr); i++)
+	{
+		const DynamicBuffer *current_line = *(const DynamicBuffer**)darr_getc(file_data->darr, i);
+		editor_process_line_matches(search_data, current_line, i);
+	}
+	if (darr_get_size(search_data->matches) == 0)
+	{
+		return;
+	}
+	screen_data->cursor_pos = editor_get_match_pos(search_data);
+}
+
+void editor_process_line_matches(SearchData *search_data, const DynamicBuffer *line, int line_index)
+{		
+	for (int j = 0; j + search_data->searched_text_index <= dbuf_get_size(line); j++)
+	{
+		int res = strncmp(dbuf_getc(line, j), search_data->searched_text, search_data->searched_text_index);
+		if (!res)
+		{
+			darr_add_single(search_data->matches, &((vec2) {.x = j, .y = line_index}));
+		}
+	}
+}
+
+void editor_process_arrow_for_search_state(SearchData *search_data, ScreenData *screen_data, int change)
+{
+	if (darr_get_size(search_data->matches) == 0)
+	{
+		return;
+	}
+	editor_change_match_index(search_data, screen_data, change);
+	screen_data->cursor_pos = editor_get_match_pos(search_data);
+}
+
+void editor_change_match_index(SearchData *search_data, ScreenData *screen_data, int change)
+{
+	size_t match_count = darr_get_size(search_data->matches);
+	search_data->match_index = ((search_data->match_index + change) + match_count) % match_count;
+}
+
+vec2 editor_get_match_pos(const SearchData* search_data)
+{
+	return *(const vec2*)darr_getc(search_data->matches, search_data->match_index);
 }
 
 int editor_process_keypress_for_write_state(ScreenData *screen_data, FileData *file_data, const PrintTextData *print_text_data, int c)

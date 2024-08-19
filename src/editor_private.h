@@ -86,3 +86,19 @@ int ctrl_key(char c);
 bool is_a_printable_character(int c);
 
 
+int editor_process_state_tick_result(int* state, int res);
+
+void editor_change_match_index(SearchData *search_data, ScreenData *screen_data, int change);
+
+void editor_process_carriage_return_for_search_state(SearchData *search_data, ScreenData *screen_data, const FileData *file_data);
+
+
+void editor_process_backspace_for_search_state(SearchData *search_data);
+
+vec2 editor_get_match_pos(const SearchData* search_data);
+
+
+void editor_process_arrow_for_search_state(SearchData *search_data, ScreenData *screen_data, int change);
+
+
+void editor_process_line_matches(SearchData *search_data, const DynamicBuffer *line, int line_index);
