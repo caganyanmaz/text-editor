@@ -140,7 +140,6 @@ char *dbuf_get_with_nul(DynamicBuffer *obj, size_t index)
 const char *dbuf_get_with_nulc(const DynamicBuffer *obj, size_t index)
 {
 	tassert(obj, "dbuf_getc: obj is NULL");
-	debuglu(dbuf_get_size(obj));
 	tassert(index < dbuf_get_size(obj) + 1, "dbuf_get_with_nulc: index out of range");
 
 	return darr_getc(obj->darr, index);

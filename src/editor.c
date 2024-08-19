@@ -107,6 +107,7 @@ void editor_render_rows(const FileData *fd, const PrintTextData *print_text_data
 		if (print_text_data->data[i].index == -1)
 		{
 			io_interface->render_row(i, 1, "~");
+			continue;
 		}
 		const DynamicBuffer *dbuf = *(DynamicBuffer**)darr_getc(fd->darr, print_text_data->data[i].file_row);
 		const char *row_data      = dbuf_get_with_nulc(dbuf, print_text_data->data[i].file_start_col);
