@@ -32,7 +32,7 @@ void darr_destroy(DynamicArray *obj)
 const void *darr_getc(const DynamicArray *obj, size_t i)
 {
 	tassert(obj, "darr_getc: obj is NULL");
-	tassert(i < obj->length, "darr_get: index out of range");
+	tassert(i < obj->length, "darr_getc: index out of range");
 
 	size_t byte_index = darr_get_byte_index(obj, i);
 	return darr_get_bytec(obj, byte_index);

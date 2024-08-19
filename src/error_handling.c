@@ -7,7 +7,7 @@
 void throw_up(const char *c)
 {
 	terminal_terminate();
-	write(STDIN_FILENO, "\x1b[H", 3);
+	//write(STDIN_FILENO, "\x1b[H", 3);
 	perror(c);
 	exit(1);
 }

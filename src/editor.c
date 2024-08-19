@@ -20,7 +20,7 @@ void editor_init(vec2 _window_size, IO_Interface _io_interface)
 {
 	g_window_size = _window_size;
 	g_cursor_pos = (vec2){ .x = 0, .y = 0 };
-	g_fd.darr = darr_create(sizeof(DynamicBuffer));
+	g_fd.darr = darr_create(sizeof(DynamicBuffer*));
 	g_io_interface = _io_interface;
 	g_last_print_screen_data.col_count = g_window_size.y;
 	g_last_print_screen_data.data = calloc(g_last_print_screen_data.col_count, sizeof(LastPrintRowData));
@@ -28,9 +28,9 @@ void editor_init(vec2 _window_size, IO_Interface _io_interface)
 
 void editor_terminate()
 {
-	for (int i = 0; i < g_fd.darr->length; i++)
+	for (size_t i = 0; i < g_fd.darr->length; i++)
 	{
-		dbuf_destroy(darr_get(g_fd.darr, i));
+		dbuf_destroy(*(DynamicBuffer**)darr_get(g_fd.darr, i));
 	}
 	darr_destroy(g_fd.darr);
 	free(g_last_print_screen_data.data);
@@ -50,8 +50,12 @@ void editor_read_file(const char *filename)
 	{
 		DynamicBuffer *dbuf = dbuf_create();
 		size_t line_size = strlen(line);
+		if (line[line_size-1] == '\n')
+		{
+			line[--line_size] = NUL;
+		}
 		dbuf_adds(dbuf, line_size, line);
-		darr_add_single(g_fd.darr, dbuf);
+		darr_add_single(g_fd.darr, &dbuf);
 	}
 	free(line);
 	// Closing file
@@ -92,20 +96,21 @@ void editor_render_rows(const FileData *fd, vec2 window_size, vec2 cursor_pos, i
 			last_print_screen_data->data[i] = (LastPrintRowData) { .index = 0, .file_row = -1, .file_start_col = -1 };
 			continue;
 		}
-		const DynamicBuffer *current_line_data = darr_getc(fd->darr, file_row);
-		size_t new_file_row = file_row + 1;
-		size_t new_file_col = dbuf_get_size(current_line_data);
+		const DynamicBuffer *current_line_data = *(DynamicBuffer **)darr_getc(fd->darr, file_row);
+		size_t row_render_size = dbuf_get_size(current_line_data) - file_col;
 		// Continue printing current file
-		if (new_file_col > file_col + window_size.x) 
+		if (row_render_size > window_size.x) 
 		{
-			new_file_row = file_row;
-			new_file_col = file_col + window_size.x;
+			row_render_size = window_size.x;
 		}
-		size_t row_render_size = new_file_col - file_col;
 		io_interface->render_row(i, row_render_size, dbuf_getc(current_line_data, file_col));
 		last_print_screen_data->data[i] = (LastPrintRowData) { .index = row_render_size, .file_row = file_row, .file_start_col = file_col };
-		file_row = new_file_row;
-		file_col = new_file_col;
+		file_col += row_render_size;
+		if (file_col == dbuf_get_size(current_line_data))
+		{
+			file_row++;
+			file_col = 0;
+		}
 	}
 }
 
@@ -163,11 +168,11 @@ int editor_process_tick()
 	{
 		DynamicBuffer *new_dbuf = dbuf_create();
 		dbuf_addc(new_dbuf, c);
-		darr_add_single(g_fd.darr, new_dbuf);
+		darr_add_single(g_fd.darr, &new_dbuf);
 	}
 	else
 	{
-		dbuf_insertc_to(darr_get(g_fd.darr, file_row), file_col, c);
+		dbuf_insertc_to(*(DynamicBuffer**)darr_get(g_fd.darr, file_row), file_col, c);
 	}
 	if( g_cursor_pos.x == g_window_size.x - 1 && g_cursor_pos.y == g_window_size.y - 1)
 	{
