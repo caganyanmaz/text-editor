@@ -31,9 +31,7 @@ void setup_terminal_behaviour();
 void terminal_init()
 {
 	dbuf = dbuf_create();
-#ifndef DEBUGGING
 	setup_terminal_behaviour();
-#endif
 	struct winsize ws;
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0)
 	{
@@ -46,9 +44,7 @@ void terminal_init()
 void terminal_terminate()
 {
 	dbuf_destroy(dbuf);
-#ifndef DEBUGGING
 	restore_terminal_behaviour();
-#endif
 }
 
 vec2 get_window_size()

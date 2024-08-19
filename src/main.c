@@ -18,7 +18,7 @@ static IO_Interface terminal_interface =
 int main(int argc, char **argv) 
 {
 #ifdef DEBUGGING
-	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
 #endif
 	if (argc < 2)
 	{
@@ -27,21 +27,18 @@ int main(int argc, char **argv)
 	}
 	terminal_init();
 	vec2 window_size = get_window_size();
-	Editor *editor = editor_init(window_size, terminal_interface);
+	Editor *editor = editor_create(window_size, terminal_interface);
 	editor_read_file(editor, argv[1]);
 	editor_clear_screen(editor);
 	int user_input_res;
 	do
 	{
-		checkpoint()
 		user_input_res = editor_process_tick(editor);
-		checkpoint()
 		editor_render_screen(editor);
-		checkpoint()
 	} while (user_input_res == TEXT_EDITOR_SUCCESSFUL_READ);
 	editor_write_file(editor, argv[1]);
 	editor_clear_screen(editor);
-	editor_terminate(editor);
+	editor_destroy(editor);
 	terminal_terminate();
 	system("clear");
 	return 0;

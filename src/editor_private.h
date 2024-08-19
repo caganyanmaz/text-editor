@@ -2,9 +2,13 @@
 #include <stdio.h>
 #include "definitions.h"
 #include "dynamic_array.h"
+#include "dynamic_buffer.h"
 #include "editor.h"
+
+#define MX_SEARCH_TEXT_LENGTH 1024
 /* Private data types */
-typedef struct { size_t index;
+typedef struct { 
+	size_t index;
 	size_t file_row;
 	size_t file_start_col;
 } PrintRowData;
@@ -27,16 +31,23 @@ typedef struct
 	DynamicArray *darr; // Dynamic Array of Dynamic buffers
 } FileData;
 
+typedef struct
+{
+	size_t searched_text_index;
+	size_t match_index;
+	char searched_text[MX_SEARCH_TEXT_LENGTH];
+	DynamicArray *matches;
+} SearchData;
+
 typedef struct _editor
 {
+	int state;
 	PrintTextData print_text_data;
 	FileData file_data;
 	ScreenData screen_data;
 	IO_Interface io_interface;
+	SearchData search_data;
 } Editor;
-
-
-
 
 /* Private function declarations */
 void editor_update_print_text_data(PrintTextData *print_text_data, const FileData *fd, const ScreenData *sd);
@@ -46,7 +57,8 @@ PrintRowData editor_update_normal_row_data(const FileData *fd, const ScreenData 
 
 void editor_render_rows(const FileData *fd, const PrintTextData *print_text_data, const IO_Interface *io_interface);
 
-int process_keypress(ScreenData *screen_data, FileData *file_data, const PrintTextData *print_text_data, const IO_Interface *io_interface);
+int editor_process_keypress_for_write_state(ScreenData *screen_data, FileData *file_data, const PrintTextData *print_text_data, int c);
+int editor_process_keypress_for_search_state(SearchData *search_data, ScreenData *screen_data, const FileData *file_data, int c);
 
 void adjust_top_file_row(ScreenData *screen_data, const FileData *file_data);
 
@@ -70,5 +82,7 @@ size_t shift_top_file_row(size_t top_file, int change, size_t file_row_count);
 
 bool is_in_range(int l, int i, int r);
 int ctrl_key(char c);
+
+bool is_a_printable_character(int c);
 
 

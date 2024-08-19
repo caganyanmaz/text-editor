@@ -11,20 +11,26 @@
 
 
 /* Function definitions */
-Editor *editor_init(vec2 window_size, IO_Interface _io_interface)
+Editor *editor_create(vec2 window_size, IO_Interface _io_interface)
 {
 	Editor *obj = malloc(sizeof(*obj));
 	obj->screen_data.cursor_pos = (vec2){ .x = 0, .y = 0};
 	obj->screen_data.top_file_row = 0;
 	obj->screen_data.window_size = window_size;
+	obj->screen_data.window_size.y--;
 	obj->file_data.darr = darr_create(sizeof(DynamicBuffer*));
 	obj->io_interface = _io_interface;
 	obj->print_text_data.col_count = obj->screen_data.window_size.y;
 	obj->print_text_data.data = calloc(obj->print_text_data.col_count, sizeof(PrintRowData));
+	obj->state = EDITOR_WRITE_STATE;
+	obj->search_data.searched_text_index = 0;
+	obj->search_data.match_index = 0;
+	obj->search_data.searched_text[0] = NUL;
+	obj->search_data.matches = darr_create(sizeof(vec2));
 	return obj;
 }
 
-void editor_terminate(Editor *obj)
+void editor_destroy(Editor *obj)
 {
 	for (size_t i = 0; i < obj->file_data.darr->length; i++)
 	{
@@ -32,6 +38,8 @@ void editor_terminate(Editor *obj)
 	}
 	darr_destroy(obj->file_data.darr);
 	free(obj->print_text_data.data);
+	free(obj->search_data.matches);
+	free(obj);
 }
 
 void editor_read_file(Editor *obj, const char *filename)
@@ -83,6 +91,16 @@ void editor_render_screen(const Editor *obj)
 	obj->io_interface.hide_cursor();
 	obj->io_interface.clear_screen();
 	editor_render_rows(&obj->file_data, &obj->print_text_data, &obj->io_interface);
+	if (obj->state == EDITOR_SEARCH_STATE)
+	{
+		const char *prefix = "Search: ";
+		size_t prefix_len  = strlen(prefix);
+		size_t msg_len     = obj->search_data.searched_text_index + prefix_len;
+		char *msg = malloc(msg_len * sizeof(char));
+		strncpy(msg, prefix, prefix_len);
+		strncpy(msg + prefix_len, obj->search_data.searched_text, obj->search_data.searched_text_index);
+		obj->io_interface.render_row(obj->print_text_data.col_count, msg_len, msg);
+	}
 	obj->io_interface.reveal_cursor();
 	obj->io_interface.flush_output();
 	vec2 real_cursor_position = get_real_cursor_position(&obj->screen_data, &obj->print_text_data);
@@ -107,9 +125,6 @@ vec2 get_real_cursor_position(const ScreenData *screen_data, const PrintTextData
 		size_t file_row       = print_text_data->data[i].file_row;
 		size_t file_start_col = print_text_data->data[i].file_start_col;
 		size_t file_end_col   = file_start_col + print_text_data->data[i].index;
-		debuglu(file_row);
-		debuglu(file_start_col);
-		debuglu(file_end_col);
 		if (screen_data->cursor_pos.y == file_row && is_in_range(file_start_col, screen_data->cursor_pos.x, file_end_col+1))
 		{
 			return (vec2) { .x = screen_data->cursor_pos.x - file_start_col, .y = i };
@@ -128,7 +143,6 @@ void editor_render_rows(const FileData *fd, const PrintTextData *print_text_data
 			io_interface->render_row(i, 1, "~");
 			continue;
 		}
-		debuglu(print_text_data->data[i].index);
 		const DynamicBuffer *dbuf = *(DynamicBuffer**)darr_getc(fd->darr, print_text_data->data[i].file_row);
 		const char *row_data      = dbuf_get_with_nulc(dbuf, print_text_data->data[i].file_start_col);
 		size_t row_size           = print_text_data->data[i].index;
@@ -193,15 +207,115 @@ PrintRowData editor_update_empty_cursor_row_data(const FileData *fd, size_t last
 
 int editor_process_tick(Editor *obj)
 {
-	int res = process_keypress(&obj->screen_data, &obj->file_data, &obj->print_text_data, &obj->io_interface);	
- 	adjust_top_file_row(&obj->screen_data, &obj->file_data);
+	int res;
+	int c = obj->io_interface.read_key();
+	if (obj->state == EDITOR_WRITE_STATE)
+	{
+		res = editor_process_keypress_for_write_state(&obj->screen_data, &obj->file_data, &obj->print_text_data, c);	
+	}
+	if (obj->state == EDITOR_SEARCH_STATE)
+	{
+		res = editor_process_keypress_for_search_state(&obj->search_data, &obj->screen_data, &obj->file_data, c);
+	}
+	adjust_top_file_row(&obj->screen_data, &obj->file_data);
 	editor_update_print_text_data(&obj->print_text_data, &obj->file_data, &obj->screen_data);
-	return res;
+	if (res == TEXT_EDITOR_SWITCH_TO_SEARCH_STATE)
+	{
+		obj->state = EDITOR_SEARCH_STATE;
+	}
+	if (res == TEXT_EDITOR_SWITCH_TO_WRITE_STATE)
+	{
+		obj->state = EDITOR_WRITE_STATE;
+	}
+	if (res == TEXT_EDITOR_EOF)
+	{
+		return TEXT_EDITOR_EOF;
+	}
+	return TEXT_EDITOR_SUCCESSFUL_READ;
 }
 
-int process_keypress(ScreenData *screen_data, FileData *file_data, const PrintTextData *print_text_data, const IO_Interface *io_interface)
+int editor_process_keypress_for_search_state(SearchData *search_data, ScreenData *screen_data, const FileData *file_data, int c) 
 {
-	int c = io_interface->read_key();
+	if (c == QUIT_KEY)
+	{
+		return TEXT_EDITOR_EOF;
+	}
+	if (c == NUL)
+	{
+		return TEXT_EDITOR_SUCCESSFUL_READ;
+	}
+	if (c == 'x')
+	{
+		return TEXT_EDITOR_SWITCH_TO_WRITE_STATE;
+	}
+	if (is_a_printable_character(c))
+	{
+		search_data->searched_text[search_data->searched_text_index++] = c;
+		return TEXT_EDITOR_SUCCESSFUL_READ;
+	}
+	if (c == BACKSPACE)
+	{
+		if (search_data->searched_text_index == 0)
+		{
+			return TEXT_EDITOR_SUCCESSFUL_READ;
+		}
+		search_data->searched_text_index--;
+		return TEXT_EDITOR_SUCCESSFUL_READ;
+	}
+	if (c == CARRIAGE_RETURN)
+	{
+		darr_clear(search_data->matches);
+		for (int i = 0; i < darr_get_size(file_data->darr); i++)
+		{
+			const DynamicBuffer *current_line = *(DynamicBuffer**)darr_getc(file_data->darr, i);
+			for (int j = 0; j + search_data->searched_text_index <= dbuf_get_size(current_line); j++)
+			{
+				int res = strncmp(dbuf_getc(current_line, j), search_data->searched_text, search_data->searched_text_index);
+				if (!res)
+				{
+					darr_add_single(search_data->matches, &((vec2) {.x = j, .y = i}));
+				}
+			}
+		}
+		if (darr_get_size(search_data->matches) == 0)
+		{
+			return TEXT_EDITOR_SUCCESSFUL_READ;
+		}
+		vec2 first_instance = *(const vec2*)darr_getc(search_data->matches, 0);
+		tassert(editor_is_cursor_in_range(file_data, first_instance), "editor_process_keypress_for_search_state: Cursor set to an invalid position");
+		screen_data->cursor_pos = first_instance;
+		return TEXT_EDITOR_SUCCESSFUL_READ;
+	}
+	if (c == ARROW_UP)
+	{
+		checkpoint()
+		debuglu(darr_get_size(search_data->matches));
+		// No data to search
+		if (darr_get_size(search_data->matches) == 0)
+		{
+			return TEXT_EDITOR_SUCCESSFUL_READ;
+		}
+		size_t match_count = darr_get_size(search_data->matches);
+		search_data->match_index = ((search_data->match_index - 1) + match_count) % match_count;
+		screen_data->cursor_pos = *(const vec2*)darr_getc(search_data->matches, search_data->match_index);
+		return TEXT_EDITOR_SUCCESSFUL_READ;
+	}
+	if (c == ARROW_DOWN)
+	{
+		if (darr_get_size(search_data->matches) == 0)
+		{
+			return TEXT_EDITOR_SUCCESSFUL_READ;
+		}
+		size_t match_count = darr_get_size(search_data->matches);
+		search_data->match_index = (search_data->match_index + 1) % match_count;
+		screen_data->cursor_pos = *(const vec2*)darr_getc(search_data->matches, search_data->match_index);
+		return TEXT_EDITOR_SUCCESSFUL_READ;
+	}
+	return TEXT_EDITOR_SUCCESSFUL_READ;
+}
+
+int editor_process_keypress_for_write_state(ScreenData *screen_data, FileData *file_data, const PrintTextData *print_text_data, int c)
+{
 	switch(c)
 	{
 		case QUIT_KEY:
@@ -226,14 +340,16 @@ int process_keypress(ScreenData *screen_data, FileData *file_data, const PrintTe
 		case CARRIAGE_RETURN:
 			process_carriage_return(screen_data, file_data, print_text_data);
 			return TEXT_EDITOR_SUCCESSFUL_READ;
+		case CTRL('f'):
+			return TEXT_EDITOR_SWITCH_TO_SEARCH_STATE;
 	}
-	if (iscntrl(c) || c >= 256)
+	if (is_a_printable_character(c))
 	{
-		return TEXT_EDITOR_SUCCESSFUL_READ;
+		process_printable_character(screen_data, file_data, print_text_data, c);
 	}
-	process_printable_character(screen_data, file_data, print_text_data, c);
 	return TEXT_EDITOR_SUCCESSFUL_READ;
 }
+
 
 void process_backspace(ScreenData *screen_data, FileData *file_data, const PrintTextData *print_text_data)
 {
@@ -244,6 +360,7 @@ void process_backspace(ScreenData *screen_data, FileData *file_data, const Print
 	{
 		return;
 	}
+	screen_data->cursor_pos = editor_retreat_cursor(screen_data->cursor_pos, file_data);
 	// If we're at the start of a line (that's not the start of file), we append the current line to the previous line
 	DynamicBuffer *current_row = *(DynamicBuffer**)darr_get(file_data->darr, file_row);
 	if (file_col == 0)
@@ -260,7 +377,6 @@ void process_backspace(ScreenData *screen_data, FileData *file_data, const Print
 	{
 		dbuf_shift_left(current_row, file_col - 1); 
 	}
-	screen_data->cursor_pos = editor_retreat_cursor(screen_data->cursor_pos, file_data);
 	// Reverting the cursor position by one
 	return;
 }
@@ -387,3 +503,7 @@ bool is_in_range(int l, int i, int r)
 	return l <= i && i < r;
 }
 
+bool is_a_printable_character(int c)
+{
+	return c >= 32 && c < 127;
+}
