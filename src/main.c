@@ -27,18 +27,18 @@ int main(int argc, char **argv)
 	}
 	terminal_init();
 	vec2 window_size = get_window_size();
-	editor_init(window_size, terminal_interface);
-	editor_read_file(argv[1]);
-	editor_clear_screen();
+	Editor *editor = editor_init(window_size, terminal_interface);
+	editor_read_file(editor, argv[1]);
+	editor_clear_screen(editor);
 	int user_input_res;
 	do
 	{
-		user_input_res = editor_process_tick();
-		editor_render_screen();
+		user_input_res = editor_process_tick(editor);
+		editor_render_screen(editor);
 	} while (user_input_res == TEXT_EDITOR_SUCCESSFUL_READ);
-	editor_write_file(argv[1]);
-	editor_clear_screen();
-	editor_terminate();
+	editor_write_file(editor, argv[1]);
+	editor_clear_screen(editor);
+	editor_terminate(editor);
 	terminal_terminate();
 	system("clear");
 	return 0;
